@@ -8,4 +8,13 @@ import react from "@astrojs/react";
 export default defineConfig({
   site: "https://your-domain.pages.dev", // update when you deploy
   integrations: [react()],
+  // ADD THIS VITE CONFIG BLOCK BELOW:
+  vite: {
+    ssr: {
+      external: ['@resvg/resvg-js']
+    },
+    optimizeDeps: {
+      exclude: ['@resvg/resvg-js']
+    }
+  }
 });
