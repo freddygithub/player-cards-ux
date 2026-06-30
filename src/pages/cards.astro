@@ -1,0 +1,19 @@
+---
+import Base from "../layouts/Base.astro";
+import CardCarousel from "../components/CardCarousel.jsx";
+import { getStandings } from "../lib/stats.js";
+
+const groups = await getStandings();
+const teams = groups.flatMap((g) => g.teams);
+---
+<Base title="Tampa Bay Club Sport — Team Cards">
+  <main class="wrap">
+    <a class="back" href="/">← Standings</a>
+    <CardCarousel teams={teams} client:load />
+  </main>
+  <style>
+    .wrap { display: flex; flex-direction: column; align-items: center; padding: 16px; min-height: 100dvh; justify-content: center; }
+    .back { position: fixed; top: 16px; left: 16px; font-size: 13px; color: #9DB2D8; padding: 8px 4px; }
+    .back:hover { color: #EAF1FF; }
+  </style>
+</Base>

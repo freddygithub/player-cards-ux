@@ -1,0 +1,30 @@
+---
+import Base from "../../layouts/Base.astro";
+import TeamCard from "../../components/TeamCard.jsx";
+import { getAllTeamCards } from "../../lib/stats.js";
+
+// One static page per team, generated at build time from Neon.
+export async function getStaticPaths() {
+  const cards = await getAllTeamCards();
+  return cards.map((team) => ({
+    params: { id: String(team.teamId) },
+    props: { team },
+  }));
+}
+
+const { team } = Astro.props;
+const title = `${team.name} — TBCS ${team.season}`;
+---
+<Base title={title} description={`${team.name}: ${team.wins}-${team.losses} this season.`}>
+  <main class="wrap">
+    <a class="back" href="/">← All teams</a>
+    <!-- No client: directive: the card is static, so Astro renders it to HTML
+         at build time and ships zero JavaScript. -->
+    <TeamCard team={team} />
+  </main>
+  <style>
+    .wrap { display: flex; flex-direction: column; align-items: center; padding: 16px; }
+    .back { align-self: flex-start; font-size: 13px; color: #9DB2D8; padding: 8px 4px; }
+    .back:hover { color: #EAF1FF; }
+  </style>
+</Base>

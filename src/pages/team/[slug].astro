@@ -1,0 +1,35 @@
+---
+import Base from "../../layouts/Base.astro";
+import TeamCard from "../../components/TeamCard.jsx";
+import { getAllTeamCards } from "../../lib/stats.js";
+
+// One static page per team, keyed on its human-readable slug.
+export async function getStaticPaths() {
+  const cards = await getAllTeamCards();
+  return cards.map((team) => ({
+    params: { slug: team.slug },
+    props: { team },
+  }));
+}
+
+const { team } = Astro.props;
+const title = `${team.name} — ${team.wins}-${team.losses} · TBCS ${team.season}`;
+const description =
+  `${team.name} (${team.division}) — ${team.wins}-${team.losses}, ` +
+  `${Math.round(team.winRate * 100)}% win rate this season in Tampa Bay Club Sport.`;
+
+// Absolute URLs (required for social unfurls). Astro.site is set in astro.config.mjs.
+const canonical = new URL(`/team/${team.slug}`, Astro.site).href;
+const image = new URL(`/team/${team.slug}.png`, Astro.site).href;
+---
+<Base title={title} description={description} image={image} canonical={canonical}>
+  <main class="wrap">
+    <a class="back" href="/">← All teams</a>
+    <TeamCard team={team} />
+  </main>
+  <style>
+    .wrap { display: flex; flex-direction: column; align-items: center; padding: 16px; }
+    .back { align-self: flex-start; font-size: 13px; color: #9DB2D8; padding: 8px 4px; }
+    .back:hover { color: #EAF1FF; }
+  </style>
+</Base>
