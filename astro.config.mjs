@@ -6,7 +6,7 @@ import react from "@astrojs/react";
 // deployed output is flat files -- fast and cheap to host on Cloudflare Pages
 // or Netlify. Re-run the build after each nightly scrape to refresh the cards.
 export default defineConfig({
-  site: "https://your-domain.pages.dev", // update when you deploy
+  site: "https://player-cards-ux.frederickmartinez-a.workers.dev",
   integrations: [react()],
   // ADD THIS VITE CONFIG BLOCK BELOW:
   vite: {
