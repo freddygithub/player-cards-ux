@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import TeamCard from "./TeamCard.jsx";
 
 const CARD_WIDTH = 412;
@@ -47,9 +47,36 @@ const css = `
   }
   .carousel .nav:hover { background: #ffffff1f; transform: scale(1.05); }
   .carousel .nav:active { transform: scale(.95); }
-  @media (max-width: 520px) {
-    .carousel { gap: 8px; }
-    .carousel .nav { width: 36px; height: 36px; font-size: 18px; }
+  .carousel-mobile { width: 100%; flex-direction: column; gap: 10px; }
+  .mobile-stage {
+    position: relative; width: 100%; max-width: 420px;
+    display: flex; align-items: center; justify-content: center;
+    touch-action: pan-y;
+  }
+  .mobile-stage .nav.overlay {
+    position: absolute; top: 50%; transform: translateY(-50%); z-index: 10;
+    width: 38px; height: 38px; font-size: 18px;
+    background: #0A1730b3; box-shadow: inset 0 0 0 1px #ffffff2a;
+  }
+  .mobile-stage .nav.overlay:active { transform: translateY(-50%) scale(.95); }
+  .mobile-stage .nav.overlay.prev { left: 2px; }
+  .mobile-stage .nav.overlay.next { right: 2px; }
+  .mobile-card { width: 100%; }
+  .mobile-card.slide-next { animation: tc-slide-next .35s cubic-bezier(.22,.7,.2,1) both; }
+  .mobile-card.slide-prev { animation: tc-slide-prev .35s cubic-bezier(.22,.7,.2,1) both; }
+  @keyframes tc-slide-next {
+    from { transform: translateX(28px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+  @keyframes tc-slide-prev {
+    from { transform: translateX(-28px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .mobile-card.slide-next, .mobile-card.slide-prev { animation: none; }
+  }
+  @media (max-width: 700px) {
+    .carousel-filters button { padding: 9px 16px; }
   }
 `;
 
@@ -61,9 +88,23 @@ function getDivisions(teams) {
     .map(t => ({ code: t.divisionCode, label: t.division }));
 }
 
+const MOBILE_QUERY = "(max-width: 700px)";
+
 export default function CardCarousel({ teams = [] }) {
   const [index, setIndex] = useState(0);
   const [activeDiv, setActiveDiv] = useState(null);
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia(MOBILE_QUERY).matches : false
+  );
+  const [direction, setDirection] = useState("next");
+  const touchStartX = useRef(null);
+
+  useEffect(() => {
+    const mq = window.matchMedia(MOBILE_QUERY);
+    const onChange = (e) => setIsMobile(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   const divisions = getDivisions(teams);
   const filtered = activeDiv ? teams.filter(t => t.divisionCode === activeDiv) : teams;
@@ -75,6 +116,7 @@ export default function CardCarousel({ teams = [] }) {
   }
 
   const go = useCallback((delta) => {
+    setDirection(delta > 0 ? "next" : "prev");
     setIndex((i) => (i + delta + count) % count);
   }, [count]);
 
@@ -86,6 +128,17 @@ export default function CardCarousel({ teams = [] }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [go]);
+
+  function onTouchStart(e) {
+    touchStartX.current = e.touches[0].clientX;
+  }
+
+  function onTouchEnd(e) {
+    if (touchStartX.current == null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    touchStartX.current = null;
+    if (Math.abs(dx) > 40) go(dx > 0 ? -1 : 1);
+  }
 
   if (!teams.length) return <p>No teams found.</p>;
 
@@ -117,36 +170,53 @@ export default function CardCarousel({ teams = [] }) {
         })}
       </div>
 
-      <div className="carousel">
-        <button className="nav prev" onClick={() => go(-1)} aria-label="Previous team">‹</button>
-        <div className="stage">
-          <div className="viewport">
-            {filtered.map((team, i) => {
-              const rel = i - index;
-              const isCurrent = rel === 0;
-              const isNear = Math.abs(rel) === 1;
-              const style = {
-                "--offset": `${rel * STEP}px`,
-                "--scale": isCurrent ? 1 : isNear ? 0.92 : 0.82,
-                "--opacity": isCurrent ? 1 : isNear ? 0.75 : 0,
-                "--pe": isNear ? "auto" : "none",
-              };
-              return (
-                <div
-                  key={team.teamId}
-                  className={`slide${isCurrent ? " is-current" : ""}${isNear ? " is-near" : ""}`}
-                  style={style}
-                  onClick={isNear ? () => go(rel) : undefined}
-                >
-                  <TeamCard team={team} />
-                </div>
-              );
-            })}
+      {isMobile ? (
+        <div className="carousel carousel-mobile">
+          <div
+            className="mobile-stage"
+            onTouchStart={onTouchStart}
+            onTouchEnd={onTouchEnd}
+          >
+            <button className="nav overlay prev" onClick={() => go(-1)} aria-label="Previous team">‹</button>
+            <div className={`mobile-card slide-${direction}`} key={filtered[index]?.teamId}>
+              <TeamCard team={filtered[index]} />
+            </div>
+            <button className="nav overlay next" onClick={() => go(1)} aria-label="Next team">›</button>
           </div>
           <div className="counter">{index + 1} / {count}</div>
         </div>
-        <button className="nav next" onClick={() => go(1)} aria-label="Next team">›</button>
-      </div>
+      ) : (
+        <div className="carousel">
+          <button className="nav prev" onClick={() => go(-1)} aria-label="Previous team">‹</button>
+          <div className="stage">
+            <div className="viewport">
+              {filtered.map((team, i) => {
+                const rel = i - index;
+                const isCurrent = rel === 0;
+                const isNear = Math.abs(rel) === 1;
+                const style = {
+                  "--offset": `${rel * STEP}px`,
+                  "--scale": isCurrent ? 1 : isNear ? 0.92 : 0.82,
+                  "--opacity": isCurrent ? 1 : isNear ? 0.75 : 0,
+                  "--pe": (isCurrent || isNear) ? "auto" : "none",
+                };
+                return (
+                  <div
+                    key={team.teamId}
+                    className={`slide${isCurrent ? " is-current" : ""}${isNear ? " is-near" : ""}`}
+                    style={style}
+                    onClickCapture={isNear ? (e) => { e.stopPropagation(); go(rel); } : undefined}
+                  >
+                    <TeamCard team={team} />
+                  </div>
+                );
+              })}
+            </div>
+            <div className="counter">{index + 1} / {count}</div>
+          </div>
+          <button className="nav next" onClick={() => go(1)} aria-label="Next team">›</button>
+        </div>
+      )}
     </div>
   );
 }

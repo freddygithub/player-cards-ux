@@ -15,6 +15,26 @@ function parseDivision(rawName) {
   return { name: rawName.slice(0, m.index).trim(), code: m[1].toLowerCase() };
 }
 
+// "2026-07-06" -> "Mon, Jul 6". Built from Y/M/D parts (not Date.parse) so it
+// never shifts a day from timezone interpretation of a bare date string.
+function formatGameDate(dateStr) {
+  if (!dateStr) return "";
+  const [y, m, d] = String(dateStr).split("-").map(Number);
+  if (!y || !m || !d) return String(dateStr);
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+}
+
+// "19:30:00" -> "7:30 PM". Falls back to the raw value if it isn't HH:MM-ish.
+function formatGameTime(timeStr) {
+  if (!timeStr) return "";
+  const m = String(timeStr).match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return String(timeStr);
+  let h = parseInt(m[1], 10);
+  const ampm = h >= 12 ? "PM" : "AM";
+  h = h % 12 || 12;
+  return `${h}:${m[2]} ${ampm}`;
+}
+
 export function slugify(s) {
   return (s || "")
     .toLowerCase()
@@ -46,6 +66,7 @@ function initCard(t) {
     homeW: 0, homeL: 0, awayW: 0, awayL: 0,
     results: [],          // chronological "W"/"L"
     locCounts: {},
+    nextGame: null,
   };
 }
 
@@ -94,7 +115,24 @@ function finalize(c) {
     homeRecord: `${c.homeW}-${c.homeL}`,
     awayRecord: `${c.awayW}-${c.awayL}`,
     imageUrl: t.image_url || null,   // ready for when you add a team-photo column
+    nextGame: c.nextGame,
   };
+}
+
+// Groups by leagueId+division (same tiers as getStandings) and stamps each
+// team with its rank + division size, so single-team lookups (getAllTeamCards)
+// don't need a separate getStandings() call to know standing.
+function assignRanks(cards) {
+  const groups = new Map();
+  for (const c of cards) {
+    const key = `${c.leagueId}:${c.divisionCode}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(c);
+  }
+  for (const teams of groups.values()) {
+    teams.sort((a, b) => b.wins - a.wins || b.winRate - a.winRate || b.setDiff - a.setDiff);
+    teams.forEach((t, i) => { t.rank = i + 1; t.divisionSize = teams.length; });
+  }
 }
 
 export async function getAllTeamCards() {
@@ -115,6 +153,14 @@ export async function getAllTeamCards() {
                 WHERE home_score IS NOT NULL AND away_score IS NOT NULL
                 ORDER BY game_date ASC, game_time ASC`;
 
+  const upcoming = ids
+    ? await sql`SELECT * FROM games
+                WHERE (home_score IS NULL OR away_score IS NULL) AND league_id = ANY(${ids})
+                ORDER BY game_date ASC, game_time ASC`
+    : await sql`SELECT * FROM games
+                WHERE home_score IS NULL OR away_score IS NULL
+                ORDER BY game_date ASC, game_time ASC`;
+
   const byId = new Map();
   for (const t of teams) byId.set(Number(t.id), initCard(t));
 
@@ -126,7 +172,25 @@ export async function getAllTeamCards() {
     if (away) record(away, false, g.away_score, g.home_score, !homeWon, g.location_name);
   }
 
+  // Nearest unplayed game per team (upcoming is already date/time ascending,
+  // so the first match per side is its next game).
+  const opponentName = (id) => {
+    const c = byId.get(Number(id));
+    return c ? parseDivision(c.raw.name).name : "TBD";
+  };
+  for (const g of upcoming) {
+    const home = byId.get(Number(g.home_team_id));
+    const away = byId.get(Number(g.away_team_id));
+    if (home && !home.nextGame) {
+      home.nextGame = { opponent: opponentName(g.away_team_id), isHome: true, date: formatGameDate(g.game_date), time: formatGameTime(g.game_time), location: g.location_name || null };
+    }
+    if (away && !away.nextGame) {
+      away.nextGame = { opponent: opponentName(g.home_team_id), isHome: false, date: formatGameDate(g.game_date), time: formatGameTime(g.game_time), location: g.location_name || null };
+    }
+  }
+
   const cards = [...byId.values()].map(finalize);
+  assignRanks(cards);
 
   // Assign unique, human-readable slugs. On collision (e.g. "Just the Tip"
   // exists in two divisions) fall back to name+division, then name+id.

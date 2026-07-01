@@ -18,9 +18,8 @@ const title = `${team.name} — TBCS ${team.season}`;
 <Base title={title} description={`${team.name}: ${team.wins}-${team.losses} this season.`}>
   <main class="wrap">
     <a class="back" href="/">← All teams</a>
-    <!-- No client: directive: the card is static, so Astro renders it to HTML
-         at build time and ships zero JavaScript. -->
-    <TeamCard team={team} />
+    <!-- client:load: the card is interactive now (tap-to-flip, share button). -->
+    <TeamCard team={team} client:load />
   </main>
   <style>
     .wrap { display: flex; flex-direction: column; align-items: center; padding: 16px; }
