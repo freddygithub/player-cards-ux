@@ -28,6 +28,8 @@ const css = `
   .carousel .viewport {
     position: relative; width: ${VIEWPORT_WIDTH}px; max-width: calc(100vw - 96px);
     height: ${VIEWPORT_HEIGHT}px; overflow: hidden;
+    mask-image: linear-gradient(to right, transparent 0%, #000 14%, #000 86%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 14%, #000 86%, transparent 100%);
   }
   .carousel .slide {
     position: absolute; top: 0; left: 50%; width: ${CARD_WIDTH}px;
