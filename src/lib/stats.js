@@ -52,6 +52,12 @@ export function initials(name) {
     .join("");
 }
 
+// "Today" in the league's local timezone, as YYYY-MM-DD text -- matches the
+// format game_date is stored in, so it can be compared lexicographically.
+function todayStr() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
+}
+
 function leagueFilter() {
   // Optional: limit which leagues get built. Comma-separated ids in env.
   if (!process.env.LEAGUE_IDS) return null;
@@ -153,12 +159,15 @@ export async function getAllTeamCards() {
                 WHERE home_score IS NOT NULL AND away_score IS NOT NULL
                 ORDER BY game_date ASC, game_time ASC`;
 
+  // "Next game" must be an actual future game -- a past game whose result
+  // just hasn't been entered yet (score still NULL) doesn't count.
+  const today = todayStr();
   const upcoming = ids
     ? await sql`SELECT * FROM games
-                WHERE (home_score IS NULL OR away_score IS NULL) AND league_id = ANY(${ids})
+                WHERE (home_score IS NULL OR away_score IS NULL) AND game_date >= ${today} AND league_id = ANY(${ids})
                 ORDER BY game_date ASC, game_time ASC`
     : await sql`SELECT * FROM games
-                WHERE home_score IS NULL OR away_score IS NULL
+                WHERE (home_score IS NULL OR away_score IS NULL) AND game_date >= ${today}
                 ORDER BY game_date ASC, game_time ASC`;
 
   const byId = new Map();

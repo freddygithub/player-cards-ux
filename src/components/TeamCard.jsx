@@ -1,4 +1,12 @@
 import React, { useState } from "react";
+import recDecPhoto from "../assets/img/rec-dec.jpg";
+
+// Astro's asset pipeline can hand back either a plain URL string or an
+// { src, width, height } metadata object depending on context -- normalize it.
+const RECDEC_URL = typeof recDecPhoto === "string" ? recDecPhoto : recDecPhoto.src;
+
+// Loosely matches "Rec Dec", "The Rec Dec", "RecDec", etc.
+const RECDEC_RE = /rec\s*dec/i;
 
 /* =========================================================================
    TeamCard — a shareable trading card for a rec-league volleyball team.
@@ -62,6 +70,7 @@ export default function TeamCard({ team = SAMPLE_TEAM }) {
   const winPct = Math.round(winRate * 100);
   const setDiff = t.setWins - t.setLosses;
   const theme = DIVISION_THEME[t.divisionCode] || DIVISION_THEME.c;
+  const nextGameAtRecDec = RECDEC_RE.test(t.nextGame?.location || "");
 
   function toggleFlip() {
     setFlipped((f) => !f);
@@ -151,6 +160,13 @@ export default function TeamCard({ team = SAMPLE_TEAM }) {
       background:
         radial-gradient(120% 75% at 50% 122%, ${theme.glow}66 0%, transparent 58%),
         linear-gradient(180deg, #0A1730CC 0%, #0A173033 26%, #0A1730B0 70%, #070F22F2 100%); }
+    /* venue photo on the card back -- softly blurred + tinted so it sets a mood without competing with text */
+    .tc-venue-photo{ position:absolute; inset:-1%; z-index:0; background-size:cover; background-position:center;
+      filter:blur(4px) saturate(1.05) contrast(1.02) brightness(.98); }
+    .tc-venue-scrim{ position:absolute; inset:0; z-index:1; pointer-events:none;
+      background:
+        radial-gradient(120% 75% at 50% 122%, ${theme.glow}3a 0%, transparent 58%),
+        linear-gradient(180deg, #0A1730A8 0%, #0A17304D 30%, #0A173094 68%, #070F22D0 100%); }
     .tc-inner{ position:relative; z-index:6; height:100%; display:flex; flex-direction:column;
       padding:clamp(14px,5vw,20px) clamp(14px,5vw,20px) clamp(12px,4vw,16px); }
     .tc-eyebrow{ font-size:10px; letter-spacing:.22em; text-transform:uppercase; color:#9DB2D8; font-weight:700; }
@@ -306,6 +322,8 @@ export default function TeamCard({ team = SAMPLE_TEAM }) {
 
           {/* back face */}
           <div className="tc face-back">
+            {nextGameAtRecDec && <div className="tc-venue-photo" style={{ backgroundImage: `url(${RECDEC_URL})` }} />}
+            {nextGameAtRecDec && <div className="tc-venue-scrim" />}
             <div className="tc-net" />
             <div className="tc-inner">
               <div className="tc-head">
